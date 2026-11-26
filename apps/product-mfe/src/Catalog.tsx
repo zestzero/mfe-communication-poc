@@ -1,4 +1,4 @@
-import { formatPrice } from '@platform/contracts';
+import { formatPrice } from '@platform/debug-panel/lib';
 import { createMessage, useAuth, useLanguage, useRuntime } from '@platform/mfe-communication';
 import { publishOn, requestNavigation } from '@platform/mfe-communication';
 import { useState } from 'react';

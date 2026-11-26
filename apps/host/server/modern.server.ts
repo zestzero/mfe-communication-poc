@@ -1,5 +1,3 @@
-import { userById } from '@platform/contracts';
-
 const passwords: Record<string, string> = {
   mara: 'atelier',
   somchai: 'atelier',
@@ -36,6 +34,13 @@ export default {
         if (!userId || passwords[body.username ?? ''] !== body.password) {
           return c.json({ message: 'Unauthorized' }, 401);
         }
+        // Server compile is CommonJS and may rewrite bare specifier imports via bundler
+        // aliases. Resolve the helpers entry from the app root at request time instead.
+        const { pathToFileURL } = await import('node:url');
+        const { createRequire } = await import('node:module');
+        const require = createRequire(process.cwd() + '/package.json');
+        const helpersUrl = pathToFileURL(require.resolve('@platform/debug-panel/lib')).href;
+        const { userById } = await import(helpersUrl);
         const user = userById(userId);
         c.header('Set-Cookie', sessionCookie(userId));
         return c.json({ auth: { status: 'authenticated', user } });

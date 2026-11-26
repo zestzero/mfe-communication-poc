@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@platform/contracts': path.resolve(root, '../contracts/src/index.ts'),
+      '@platform/debug-panel/lib': path.resolve(root, '../platform/src/lib/index.ts'),
     },
   },
   test: { environment: 'node', include: ['src/**/*.test.ts'] },

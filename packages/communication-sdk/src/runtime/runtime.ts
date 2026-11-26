@@ -6,14 +6,13 @@ import {
   CONTRACT_VERSION,
   PlatformMessageSchema,
   anonymousContext,
-  redact,
-  userById,
   type AuthState,
   type LanguageState,
   type NavigationState,
   type PlatformContext,
   type PlatformMessage,
 } from '@platform/contracts';
+import { redact, userById } from '@platform/debug-panel/lib';
 import mitt, { type Emitter } from 'mitt';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 

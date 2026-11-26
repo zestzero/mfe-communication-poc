@@ -4,7 +4,7 @@ import { PlatformProvider, requestLanguageChange, requestLogin, requestLogout, u
 import { applyAuth, applyLanguage, applyNavigation } from '@platform/mfe-communication/host';
 import { Link, Outlet, useLoaderData, useLocation, useNavigate } from '@modern-js/runtime/router';
 import { useEffect, useState, type FormEvent } from 'react';
-import { CartControllerRemote } from '../remotes';
+import { persistentRemotes } from '../remotes';
 import { useRemoteStatuses } from '../remote-status';
 import { shellCopy } from '../shell';
 import '../styles.css';
@@ -116,7 +116,7 @@ function Shell() {
         </div>
       </header>
       {error ? <p role="alert" data-testid="login-error">{error}</p> : null}
-      <CartControllerRemote />
+      {persistentRemotes.map((Remote, index) => <Remote key={index} />)}
       <main className="mt-6">
         <Outlet />
       </main>

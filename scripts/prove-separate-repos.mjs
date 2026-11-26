@@ -31,7 +31,9 @@ function rewriteDeps(pkgPath, tarballs) {
   writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-for (const port of [3100, 3101, 3102, 3103]) {
+const remoteRegistry = JSON.parse(readFileSync(path.join(root, 'config/remotes.json'), 'utf8'));
+const isolatedHostPort = 3100;
+for (const port of [isolatedHostPort, ...remoteRegistry.map((remote) => remote.port + 100)]) {
   try {
     const pids = execFileSync('lsof', ['-t', `-iTCP:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).trim();
     for (const pid of pids.split('\n').filter(Boolean)) {
@@ -43,7 +45,7 @@ for (const port of [3100, 3101, 3102, 3103]) {
 }
 rmSync(out, { recursive: true, force: true });
 mkdirSync(packs, { recursive: true });
-await run('pnpm', ['-r', '--filter', './packages/*', 'build'], { cwd: root });
+await run('pnpm', ['build:packages'], { cwd: root });
 for (const folder of ['contracts', 'communication-sdk', 'platform', 'tsconfig']) {
   await run('pnpm', ['pack', '--pack-destination', packs], { cwd: path.join(root, 'packages', folder) });
 }
@@ -65,29 +67,24 @@ function copyApp(folder) {
   return dest;
 }
 
-const product = copyApp('product-mfe');
-const cart = copyApp('cart-mfe');
-const profile = copyApp('profile-mfe');
+const copies = remoteRegistry.map((remote) => ({ remote, dir: copyApp(`${remote.name}-mfe`) }));
 const host = copyApp('host');
 
-for (const dir of [product, cart, profile, host]) {
+for (const dir of [...copies.map((copy) => copy.dir), host]) {
   await run('pnpm', ['install', '--prefer-offline'], { cwd: dir });
 }
-await run('pnpm', ['build'], { cwd: product, env: { ...process.env, PORT: '3101', PUBLIC_ORIGIN: 'http://127.0.0.1:3101' } });
-await run('pnpm', ['build'], { cwd: cart, env: { ...process.env, PORT: '3102', PUBLIC_ORIGIN: 'http://127.0.0.1:3102' } });
-await run('pnpm', ['build'], { cwd: profile, env: { ...process.env, PORT: '3103', PUBLIC_ORIGIN: 'http://127.0.0.1:3103' } });
+for (const { remote, dir } of copies) {
+  const port = String(remote.port + 100);
+  await run('pnpm', ['build'], { cwd: dir, env: { ...process.env, PORT: port, PUBLIC_ORIGIN: `http://127.0.0.1:${port}` } });
+}
 
-const remoteEnv = {
-  PRODUCT_REMOTE_URL: 'http://127.0.0.1:3101/static/mf-manifest.json',
-  CART_REMOTE_URL: 'http://127.0.0.1:3102/static/mf-manifest.json',
-  PROFILE_REMOTE_URL: 'http://127.0.0.1:3103/static/mf-manifest.json',
-};
+const remoteEnv = Object.fromEntries(
+  remoteRegistry.map((remote) => [remote.env, `http://127.0.0.1:${remote.port + 100}/static/mf-manifest.json`]),
+);
 
-const servers = [
-  spawn('pnpm', ['serve'], { cwd: product, stdio: 'inherit', env: { ...process.env, PORT: '3101' } }),
-  spawn('pnpm', ['serve'], { cwd: cart, stdio: 'inherit', env: { ...process.env, PORT: '3102' } }),
-  spawn('pnpm', ['serve'], { cwd: profile, stdio: 'inherit', env: { ...process.env, PORT: '3103' } }),
-];
+const servers = copies.map(({ remote, dir }) =>
+  spawn('pnpm', ['serve'], { cwd: dir, stdio: 'inherit', env: { ...process.env, PORT: String(remote.port + 100) } }),
+);
 
 async function waitFor(url) {
   const deadline = Date.now() + 60_000;
@@ -103,21 +100,17 @@ async function waitFor(url) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-await Promise.all([
-  waitFor('http://127.0.0.1:3101/static/mf-manifest.json'),
-  waitFor('http://127.0.0.1:3102/static/mf-manifest.json'),
-  waitFor('http://127.0.0.1:3103/static/mf-manifest.json'),
-]);
+await Promise.all(remoteRegistry.map((remote) => waitFor(`http://127.0.0.1:${remote.port + 100}/static/mf-manifest.json`)));
 
 try {
-  await run('pnpm', ['build'], { cwd: host, env: { ...process.env, ...remoteEnv, PORT: '3100' } });
+  await run('pnpm', ['build'], { cwd: host, env: { ...process.env, ...remoteEnv, PORT: String(isolatedHostPort) } });
   const hostServer = spawn('pnpm', ['serve'], {
     cwd: host,
     stdio: 'inherit',
-    env: { ...process.env, ...remoteEnv, PORT: '3100' },
+    env: { ...process.env, ...remoteEnv, PORT: String(isolatedHostPort) },
   });
   servers.push(hostServer);
-  await waitFor('http://127.0.0.1:3100/products');
+  await waitFor(`http://127.0.0.1:${isolatedHostPort}/products`);
 
   const html = await (await fetch('http://127.0.0.1:3100/products')).text();
   if (!html.includes('Cedar Pour-Over')) {

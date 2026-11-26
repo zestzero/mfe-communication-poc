@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { anonymousContext, publicUsers } from '@platform/contracts';
-import { applyAuth, publishOn, requestNavigation } from './channel';
-import { contextFromRequest, createRuntime, readContext } from './runtime';
-import { readRequestSnapshot, runWithRequest } from './server';
+import { applyAuth } from '../auth/commands.js';
+import { publishOn } from '../events/bus.js';
+import { requestNavigation } from '../navigation/commands.js';
+import { contextFromRequest, createRuntime, readContext } from './runtime.js';
+import { readRequestSnapshot, runWithRequest } from '../server/index.js';
 
 const mara = publicUsers[0]!;
 const somchai = publicUsers[1]!;

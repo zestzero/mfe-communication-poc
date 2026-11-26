@@ -29,7 +29,15 @@ CART_REMOTE_URL=http://127.0.0.1:3002/static/mf-manifest.json
 PROFILE_REMOTE_URL=http://127.0.0.1:3003/static/mf-manifest.json
 ```
 
-Copy `.env.example` if you move an app. `pnpm --filter @platform/product-mfe dev` starts that MFE alone. Its `/` route is a standalone adapter with a mock anonymous runtime and does not replace the host runtime when the component is federated.
+Copy `.env.example` if you move an app. `pnpm remotes:generate` rewrites that example, the host route files, and the static Module Federation imports from `config/remotes.json`. `pnpm --filter @platform/product-mfe dev` starts that MFE alone. Its `/` route is a standalone adapter with a mock anonymous runtime and does not replace the host runtime when the component is federated.
+
+To add a remote, run the Bootstrap remote GitHub Action, or locally:
+
+```bash
+node scripts/bootstrap-remote.mjs --name reviews --route /reviews --port 3004 --protected false
+```
+
+The action opens a pull request that contains the new app and the registry change. The host does not get a hand-written remote entry.
 
 ## Checks
 

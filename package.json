@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
-    "build": "pnpm -r --filter \"./packages/*\" --if-present build && pnpm -r --filter \"./apps/*\" build",
+    "build:packages": "pnpm --filter @platform/contracts --filter @platform/tsconfig build && pnpm --filter @platform/debug-panel build:lib && pnpm --filter @platform/mfe-communication build && pnpm --filter @platform/debug-panel build:panel",
+    "build": "pnpm build:packages && pnpm -r --filter \"./apps/*\" build",
+    "remotes:generate": "node scripts/generate-remotes.mjs",
     "start": "pnpm --parallel --filter \"./apps/*\" serve",
     "test": "pnpm -r --if-present test && pnpm exec vitest run --config vitest.boundaries.config.ts",
     "test:e2e": "playwright test",

@@ -1,0 +1,29 @@
+[
+  {
+    "name": "product",
+    "env": "PRODUCT_REMOTE_URL",
+    "port": 3001,
+    "route": "/products",
+    "protected": false,
+    "exposes": [{ "export": "Catalog", "testId": "mfe-product", "loading": "Loading products…" }],
+    "persistent": []
+  },
+  {
+    "name": "cart",
+    "env": "CART_REMOTE_URL",
+    "port": 3002,
+    "route": "/cart",
+    "protected": true,
+    "exposes": [{ "export": "CartView", "testId": "mfe-cart", "loading": "Loading basket…" }],
+    "persistent": [{ "export": "CartController", "testId": "cart-controller", "loading": "" }]
+  },
+  {
+    "name": "profile",
+    "env": "PROFILE_REMOTE_URL",
+    "port": 3003,
+    "route": "/profile",
+    "protected": true,
+    "exposes": [{ "export": "ProfileView", "testId": "mfe-profile", "loading": "Loading profile…" }],
+    "persistent": []
+  }
+]

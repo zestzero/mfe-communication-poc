@@ -2,18 +2,19 @@ import { createLazyComponent, lazyLoadComponentPlugin } from '@module-federation
 import { getInstance, registerShared } from '@module-federation/modern-js-v3/runtime';
 import * as Contracts from '@platform/contracts';
 import * as Communication from '@platform/mfe-communication';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, type ComponentType, type ReactNode } from 'react';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { markRemote } from './remote-status';
+import { createRemoteComponents } from './remotes/factory';
+import { remoteLoaders } from './remotes/imports.generated';
+import { remoteRegistry } from './remotes/registry.generated';
 
 const instance = getInstance();
 if (!instance) {
   throw new Error('Module Federation runtime is not initialized');
 }
 
-// The server bundle does not emit shared providers into the webpack share scope.
-// Register the host copies explicitly so remotes reuse this React and this SDK.
 const shared = {
   react: {
     version: '19.3.1',
@@ -62,43 +63,36 @@ function failure(name: string) {
   );
 }
 
-export const ProductRemote = createLazyComponent({
-  loader: () => import('product/Catalog'),
-  instance,
-  loading: 'Loading products…',
-  export: 'Catalog',
-  fallback: failure('product'),
-});
+const lazy = createLazyComponent as (options: {
+  loader: () => Promise<unknown>;
+  instance: typeof instance;
+  loading: string;
+  export: string;
+  fallback: (props: { error?: unknown }) => ReactNode;
+}) => ComponentType;
 
-export const CartViewRemote = createLazyComponent({
-  loader: () => import('cart/CartView'),
-  instance,
-  loading: 'Loading basket…',
-  export: 'CartView',
-  fallback: failure('cart'),
-});
+const created = createRemoteComponents(remoteRegistry, remoteLoaders, instance, (options) =>
+  lazy({
+    loader: options.loader,
+    instance,
+    loading: options.loading,
+    export: options.exportName,
+    fallback: failure(options.name),
+  }),
+);
 
-export const CartControllerRemote = createLazyComponent({
-  loader: () => import('cart/CartController'),
-  instance,
-  loading: '',
-  export: 'CartController',
-  fallback: failure('cart'),
-});
+export const remoteComponents = created.components;
+export const persistentRemotes = created.persistent;
 
-export const ProfileRemote = createLazyComponent({
-  loader: () => import('profile/ProfileView'),
-  instance,
-  loading: 'Loading profile…',
-  export: 'ProfileView',
-  fallback: failure('profile'),
-});
+export function RemoteView({ id }: { id: string }) {
+  const Remote = remoteComponents[id] as ComponentType | undefined;
+  if (!Remote) throw new Error(`Remote ${id} is not in the registry`);
+  return <Remote />;
+}
 
 export function RemoteReady({ name, testId, children }: { name: string; testId: string; children: ReactNode }) {
   useEffect(() => {
-    if (document.querySelector(`[data-testid="${testId}"]`)) {
-      markRemote(name, 'ready');
-    }
+    if (document.querySelector(`[data-testid="${testId}"]`)) markRemote(name, 'ready');
   }, [name, testId]);
   return children;
 }

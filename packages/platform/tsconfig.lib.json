@@ -1,0 +1,12 @@
+{
+  "extends": "@platform/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/lib/**/*.ts"],
+  "exclude": ["src/lib/**/*.test.ts"]
+}

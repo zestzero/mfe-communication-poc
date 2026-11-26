@@ -1,0 +1,52 @@
+name: Bootstrap remote
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Remote slug, such as reviews
+        required: true
+        type: string
+      route:
+        description: Host route, such as /reviews
+        required: true
+        type: string
+      port:
+        description: Local port
+        required: true
+        type: string
+      protected:
+        description: Require authentication
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Scaffold the remote and update the registry
+        run: node scripts/bootstrap-remote.mjs --name "${{ inputs.name }}" --route "${{ inputs.route }}" --port "${{ inputs.port }}" --protected "${{ inputs.protected }}"
+      - name: Refresh the lockfile
+        run: pnpm install --no-frozen-lockfile
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: cursor/bootstrap-${{ inputs.name }}-bab3
+          title: Add the ${{ inputs.name }} remote
+          commit-message: Add the ${{ inputs.name }} remote from the registry
+          body: |
+            Scaffolds `apps/${{ inputs.name }}-mfe` from the remote template and adds it to `config/remotes.json`.
+            The host federation config, static imports, and route files are generated from that registry.
+          delete-branch: true

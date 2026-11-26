@@ -24,7 +24,7 @@ Host-owned writes go through `applyAuth`, `applyLanguage`, and `applyNavigation`
 
 ## How independently deployed MFEs handle contract version mismatches
 
-Every envelope has `version: 1`, and `PlatformMessageSchema` rejects anything else. The rejected payload is stored as a validation error and is not emitted. `@platform/contracts` is semver `1.0.0`. Consumers depend on `^1.0.0`. A minor release may add optional fields. Zod strips unknown keys by default, so an older consumer ignores them. A new required field or a new event meaning is a major bump. The shared Module Federation range `^1.0.0` refuses a 2.x singleton, so a mismatched deploy fails visibly instead of mixing two contract copies in one page.
+`@platform/contracts` is schemas and the data they describe. Path checks, redaction, price formatting, and `federationShared` live in `@platform/debug-panel/lib`. Every envelope has `version: 1`, and `PlatformMessageSchema` rejects anything else. The rejected payload is stored as a validation error and is not emitted. `@platform/contracts` is semver `1.0.0`. Consumers depend on `^1.0.0`. A minor release may add optional fields. Zod strips unknown keys by default, so an older consumer ignores them. A new required field or a new event meaning is a major bump. The shared Module Federation range `^1.0.0` refuses a 2.x singleton, so a mismatched deploy fails visibly instead of mixing two contract copies in one page.
 
 ## What happens when an event consumer is unavailable
 

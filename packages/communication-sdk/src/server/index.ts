@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { PlatformContext } from '@platform/contracts';
-import { createRuntime, readContext, type Runtime } from './runtime';
+import { createRuntime, readContext, type Runtime } from '../runtime/runtime.js';
 
-export { contextFromRequest } from './runtime';
+export { contextFromRequest } from '../runtime/runtime.js';
 
 const requests = new AsyncLocalStorage<Runtime>();
 

@@ -1,36 +1,9 @@
 import type { LanguageState } from '@platform/contracts';
-import { useEffect } from 'react';
-import {
-  applyAuth,
-  applyLanguage,
-  applyNavigation,
-  publishOn,
-  requestLanguageChange,
-  requestLogin,
-  requestLogout,
-  requestNavigation,
-  subscribeOn,
-} from './channel';
-import { useRuntime } from './react';
-import type { PlatformMessage } from '@platform/contracts';
-
-export function publish(input: unknown): PlatformMessage {
-  return publishOn(useRuntime(), input, 'mfe');
-}
-
-export function subscribe(type: string, handler: (message: PlatformMessage) => void): () => void {
-  return subscribeOn(useRuntime(), type, handler);
-}
-
-export function usePublish(source: string) {
-  const runtime = useRuntime();
-  return (input: unknown) => publishOn(runtime, input, source);
-}
-
-export function useSubscription(type: string, source: string, handler: (message: PlatformMessage) => void) {
-  const runtime = useRuntime();
-  useEffect(() => subscribeOn(runtime, type, handler), [runtime, type, source, handler]);
-}
+import { requestLanguageChange } from './language/commands.js';
+import { requestLogin, requestLogout, applyAuth } from './auth/commands.js';
+import { applyLanguage } from './language/commands.js';
+import { applyNavigation, requestNavigation } from './navigation/commands.js';
+import { useRuntime } from './runtime/provider.js';
 
 export function useCommands(source: string) {
   const runtime = useRuntime();

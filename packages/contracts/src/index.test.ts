@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  PlatformMessageSchema,
-  formatPrice,
-  isProtectedPath,
-  isSafeDestination,
-  redact,
-} from './index';
+import { PlatformMessageSchema } from './index';
 
 const envelope = {
   id: '8d8b1e4a-3c1e-4f0a-9c1e-6b8a7c2d4e11',
@@ -35,20 +29,4 @@ describe('contracts v1', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects external navigation and unknown paths', () => {
-    expect(isSafeDestination('/products')).toBe(true);
-    expect(isSafeDestination('https://evil.example')).toBe(false);
-    expect(isSafeDestination('//evil.example')).toBe(false);
-    expect(isSafeDestination('/admin')).toBe(false);
-    expect(isProtectedPath('/cart')).toBe(true);
-    expect(isProtectedPath('/products')).toBe(false);
-  });
-
-  it('redacts secrets and formats money', () => {
-    expect(redact({ password: 'atelier', name: 'Mara' })).toEqual({
-      password: '[redacted]',
-      name: 'Mara',
-    });
-    expect(formatPrice(4800, 'en')).toBe('$48.00');
-  });
 });

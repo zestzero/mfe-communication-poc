@@ -17,9 +17,9 @@
       "default": "./dist/host.js"
     },
     "./server": {
-      "types": "./dist/server.d.ts",
-      "import": "./dist/server.js",
-      "default": "./dist/server.js"
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     }
   },
   "scripts": {
@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@platform/contracts": "^1.0.0",
+    "@platform/debug-panel": "^1.0.0",
     "mitt": "3.0.1",
     "zustand": "5.0.8"
   },

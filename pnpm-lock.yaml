@@ -29,6 +29,9 @@ importers:
       '@platform/contracts':
         specifier: ^1.0.0
         version: link:../../packages/contracts
+      '@platform/debug-panel':
+        specifier: ^1.0.0
+        version: link:../../packages/platform
       '@platform/mfe-communication':
         specifier: ^1.0.0
         version: link:../../packages/communication-sdk
@@ -142,6 +145,9 @@ importers:
       '@platform/contracts':
         specifier: ^1.0.0
         version: link:../../packages/contracts
+      '@platform/debug-panel':
+        specifier: ^1.0.0
+        version: link:../../packages/platform
       '@platform/mfe-communication':
         specifier: ^1.0.0
         version: link:../../packages/communication-sdk
@@ -197,6 +203,9 @@ importers:
       '@platform/contracts':
         specifier: ^1.0.0
         version: link:../../packages/contracts
+      '@platform/debug-panel':
+        specifier: ^1.0.0
+        version: link:../../packages/platform
       '@platform/mfe-communication':
         specifier: ^1.0.0
         version: link:../../packages/communication-sdk
@@ -246,6 +255,9 @@ importers:
       '@platform/contracts':
         specifier: ^1.0.0
         version: link:../contracts
+      '@platform/debug-panel':
+        specifier: ^1.0.0
+        version: link:../platform
       mitt:
         specifier: 3.0.1
         version: 3.0.1
@@ -293,10 +305,10 @@ importers:
       '@platform/contracts':
         specifier: ^1.0.0
         version: link:../contracts
+    devDependencies:
       '@platform/mfe-communication':
         specifier: ^1.0.0
         version: link:../communication-sdk
-    devDependencies:
       '@platform/tsconfig':
         specifier: ^1.0.0
         version: link:../tsconfig
