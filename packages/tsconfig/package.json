@@ -1,9 +1,10 @@
 {
-  "name": "@mfe/tsconfig",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@platform/tsconfig",
+  "version": "1.0.0",
+  "private": false,
   "files": ["base.json", "react.json"],
   "scripts": {
-    "build": "node -e \"process.stdout.write('tsconfig ok\\n')\""
+    "build": "node -e \"process.stdout.write('tsconfig 1.0.0\\n')\"",
+    "typecheck": "node -e \"process.exit(0)\""
   }
 }

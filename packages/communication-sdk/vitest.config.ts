@@ -7,11 +7,8 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '@mfe/contracts': path.resolve(root, '../contracts/src/index.ts'),
+      '@platform/contracts': path.resolve(root, '../contracts/src/index.ts'),
     },
   },
-  test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
-  },
+  test: { environment: 'node', include: ['src/**/*.test.ts'] },
 });

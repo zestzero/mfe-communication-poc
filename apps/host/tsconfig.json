@@ -3,9 +3,11 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "noEmit": true,
     "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
     "types": ["react", "react-dom", "node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "modern.config.ts", "module-federation.config.ts"]
+  "include": ["src", "server", "modern.config.ts", "module-federation.config.ts"]
 }

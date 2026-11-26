@@ -1,7 +1,7 @@
 {
   "name": "mfe-communication-poc",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "packageManager": "pnpm@10.33.4",
   "engines": {
     "node": ">=20.19.5"
@@ -9,8 +9,12 @@
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "build": "pnpm -r --filter \"./packages/*\" --if-present build && pnpm -r --filter \"./apps/*\" build",
+    "start": "pnpm --parallel --filter \"./apps/*\" serve",
     "test": "pnpm -r --if-present test && pnpm exec vitest run --config vitest.boundaries.config.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm typecheck",
+    "prove:split": "node scripts/prove-separate-repos.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

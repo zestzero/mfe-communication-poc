@@ -1,18 +1,9 @@
-import { DebugPanel } from '../components/DebugPanel';
-import { Header } from '../components/Header';
-import { CartRemote, ProductRemote, ProfileRemote } from '../remotes';
-import './page.css';
+import { useLanguage } from '@platform/mfe-communication';
+import { shellCopy } from '../shell';
 
-const Page = () => (
-  <div className="page">
-    <Header />
-    <main className="stage">
-      <ProductRemote />
-      <CartRemote />
-      <ProfileRemote />
-    </main>
-    <DebugPanel />
-  </div>
-);
+export function HomePanel() {
+  const language = useLanguage();
+  return <p className="text-lg" data-testid="home-copy">{shellCopy[language.locale].welcome}</p>;
+}
 
-export default Page;
+export default HomePanel;

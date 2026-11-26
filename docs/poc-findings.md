@@ -1,100 +1,54 @@
 # PoC findings
 
-These answers were measured on this repo with Modern.js 3.12.0, `@module-federation/modern-js-v3` 2.9.4, `@module-federation/rsbuild-plugin` 2.9.4, Rsbuild 2.3.5, and React 19.3.1. The uploaded spec file was not on disk when the work started, so the questions below are the ones fixed in the implementation plan from the task summary and the official Modern.js and Module Federation guides.
+Measured with Modern.js 3.12, `@module-federation/modern-js-v3` 2.9.4, React 19.3.1, and contract package 1.0.0. `GET /products` contains `Cedar Pour-Over` before any client JavaScript. Two concurrent requests, one for Mara in English and one for สมชาย in Thai, do not contain each other's name or product title.
 
-## 1. Can the Modern.js v3 host stream-SSR a page that composes the three Rsbuild remotes?
+## Why Mitt was chosen
 
-Yes for the shell, no for the remote component trees.
+The host and the MFEs need a tiny in-process bus for commands and facts that have already happened. Mitt is a few hundred bytes, has no store of its own, and makes subscription cleanup explicit. That matches transient UI events. It does not pretend to be a durable log.
 
-`GET /` returns `200` with `Transfer-Encoding: chunked`, `x-modernjs-render: server`, `content-type: text/html`, and a `server-timing` entry `bd-modern-js-ssr-render-html`. The inline bootstrap sets `"mode":"stream"`. The HTML includes the masthead (`data-testid="host-header"`), the name Mara Ellison, the basket count 0, and the debug panel. Playwright covers that without executing page JavaScript.
+## Why Zustand was chosen instead of Jotai or Redux
 
-## 2. Does remote component HTML appear in the SSR response, or only the host shell?
+The shared context is one snapshot with three slices: auth, language, and navigation. Zustand's vanilla store gives `getState`, `setState`, and `subscribe` without a React binding, so the same store can be created per SSR request and then read with `useSyncExternalStore`. Jotai's atom graph is a poor fit for a single host-owned snapshot. Redux adds action boilerplate and a single global store, which is the opposite of per-request isolation. Cart lines are deliberately not in this store. The cart MFE keeps them on the runtime object.
 
-Only the host shell, plus the loading strings from `createLazyComponent`.
+## How the SDK guarantees runtime instance consistency
 
-The raw HTML contains `Loading the product atelier` and does not contain `Cedar Pour-Over`. After hydration the browser requests each `mf-manifest.json` and `remoteEntry.js`, then the exposed panel CSS and JS. The product names appear only after that.
+`PlatformProvider` creates the runtime. On the server it uses the `runtimeId` from the route loader. On the browser, `ensureBrowserRuntime` creates that id once and returns the same object afterward. Module Federation shares `@platform/mfe-communication` as a singleton at `^1.0.0`, so host and remotes call `useRuntime()` on that object. Playwright reads the same id from the debug panel and from `data-runtime-id` on the product.
 
-## 3. Which official producer setups support Module Federation SSR, and why was this the smallest viable path?
+## How SSR request isolation is achieved
 
-Official docs checked before configuration:
+`contextFromRequest` is a pure function of the `Cookie` header and the URL. The layout loader returns that snapshot plus a fresh `runtimeId`. `PlatformProvider` builds a new Zustand store from it for that render. Nothing user-specific is stored in a process-wide singleton. `runWithRequest` also puts a runtime in `AsyncLocalStorage` for non-React server work, and a unit test interleaves two of those scopes. The HTTP proof is the concurrent Playwright request test.
 
-- Modern.js SSR guide: both producer and consumer set `server.ssr.mode: 'stream'`. Application-level bridge modules cannot SSR. Consumers load component exports with `createLazyComponent`.
-- Module Federation Modern.js quick start: `moduleFederationPlugin()`, `createModuleFederationConfig`, remotes pointed at `mf-manifest.json`.
-- Rsbuild plugin reference: `pluginModuleFederation(options, { target })`. `target: 'dual'` is only supported as a global plugin in Rslib or Rspress. An Rsbuild app uses `target: 'node'` with `environment` for one environment. The deprecated `ssr: true` flag tells you to use `target: 'dual'`.
+## How state ownership is enforced
 
-What this repo measured: each Rsbuild dev manifest has `remoteEntry.type: "global"` and no `ssrRemoteEntry`. With `noSSR` left off, the host log is:
+Host-owned writes go through `applyAuth`, `applyLanguage`, and `applyNavigation`, which the host registers as command handlers. MFEs only import the public package and call `request*` or `publish`. `isSafeDestination` rejects protocol-relative and external URLs. Protected paths are refused while the snapshot is anonymous. Cart mutations happen in `CartController`. Product selection is `useState` inside the product component.
 
-`Failed to load Node.js entry for remote "product" from "http://127.0.0.1:3001/remoteEntry.js". self is not defined`
+## How independently deployed MFEs handle contract version mismatches
 
-The SSR HTML then rendered the error fallback instead of the panel.
+Every envelope has `version: 1`, and `PlatformMessageSchema` rejects anything else. The rejected payload is stored as a validation error and is not emitted. `@platform/contracts` is semver `1.0.0`. Consumers depend on `^1.0.0`. A minor release may add optional fields. Zod strips unknown keys by default, so an older consumer ignores them. A new required field or a new event meaning is a major bump. The shared Module Federation range `^1.0.0` refuses a 2.x singleton, so a mismatched deploy fails visibly instead of mixing two contract copies in one page.
 
-Alternatives:
+## What happens when an event consumer is unavailable
 
-| Option | Fits the spec? | Remote HTML in the stream? |
-| --- | --- | --- |
-| Make product, cart, and profile Modern.js apps with `server.ssr.mode: 'stream'` | Drops the Rsbuild MFE requirement | Yes, this is the documented producer |
-| Rebuild them as Rslib libraries with `target: 'dual'` | They stop being Rsbuild apps with their own dev servers | Yes, this is the documented non-Modern producer |
-| Hand-merge a Node build into `ssrRemoteEntry` | Invents a manifest the plugin does not emit for Rsbuild apps | Unverified |
-| `createLazyComponent({ noSSR: true })` | Keeps Rsbuild apps, the Modern.js host, and streaming SSR of the shell | No |
+Mitt does not buffer. If `CartController` is not mounted, `cart.item.add.requested` is still recorded in the debug history and then dropped. No other MFE throws. If a remote server is down, `createLazyComponent`'s fallback renders an alert for that slot. Playwright aborts port 3003 and `/products` still shows the catalog and the header.
 
-`noSSR` is a field on `CreateLazyComponentOptions` in `@module-federation/bridge-react`, re-exported by `@module-federation/modern-js-v3/data-fetch`. That is the smallest path that still uses the official loader and keeps each MFE as an Rsbuild app.
+## Whether this approach scales to 20 or more MFEs
 
-## 4. Can the microfrontends exchange events without importing another app's source?
+The host can mount more component remotes, and the bus does not get more expensive with idle subscribers. The costs that do grow are the shared singleton graph, the SSR fan-out to every producer on the critical path, and the contract review load. Twenty always-mounted SSR remotes would make the host's TTFB the sum of the slowest producers. Keep rarely used MFEs on a route that is not in the root layout, and keep only a headless controller mounted when a subscription must survive navigation. The cart controller is that pattern.
 
-Yes. Product publishes `cart.item.added`. Cart renders the line. The host basket count becomes 1. Profile renders `Looking at Cedar Pour-Over` after `catalog.product.selected`. Switching the user updates the host masthead and the profile heading together, and the basket line stays. `boundaries.test.ts` scans every app source file and fails if it mentions another app's package name or directory. Playwright `storefront.spec.ts` drives the same path in Chromium.
+## When RxJS would be justified
 
-## 5. Do Mitt and the Zustand store stay singletons across the host and the remotes in the browser?
+RxJS is worth it when a stream needs debounce, retry, backpressure, or cancellation across time, for example typeahead against a flaky API. These UI commands are discrete and already completed or rejected. RxJS would hide the simple subscribe/unsubscribe lifecycle this PoC needs to test.
 
-Yes in the running page. One click updates the product panel, the cart panel, the masthead, and the debug log together. The debug counter (`Mitt deliveries`) increments from `onAny` while the log row comes from the Zustand store, so both objects see the event. Unit tests assert that two `getRuntime()` calls return the same bus and the same store, and that `resetCommunication()` keeps that store identity.
+## Whether additional infrastructure is required for production
 
-## 6. What did Module Federation `shared` change, compared with the `globalThis` runtime?
+Yes, beyond this process.
 
-`shared` is configured for `react`, `react-dom`, and `@mfe/communication-sdk` (`singleton: true`, eager on the host). That is what keeps a single React copy, which hooks require.
+- Replace the mock password table with an identity provider. Keep the HttpOnly session cookie and the safe user projection.
+- Publish `@platform/contracts`, `@platform/mfe-communication`, and `@platform/debug-panel` to a registry. Do not rely on the monorepo link.
+- Serve each MFE from its own origin and set the host's remote URL env vars to those manifests.
+- Put a timeout and a circuit breaker around SSR remote loads so one slow producer cannot hold the stream.
+- The cart lines are in memory for the document. A reload starts empty unless a real cart service is added behind `CartController`.
+- `react-helmet@6`, pulled in by Modern.js, still declares a React 16–18 peer. The page runs on React 19.3.1, which Modern.js 3.12 requires.
 
-The SDK additionally anchors the bus and the store on `globalThis` with `Symbol.for('@mfe/communication-sdk/runtime')`. Module Federation inferred `requiredVersion: workspace:*` from the workspace protocol and warned that version `0.0.0` did not satisfy it. Setting `requiredVersion: false` on that share turns the version check off. The symbol still unifies the runtime if the bundler evaluates the package twice in the same window.
+## Mode A and Mode B
 
-## 7. Does the bus run during SSR, and is the store safe across requests?
-
-The bus does not run during render. `publish` is only called from button clicks. The server and the first client render both read the initial state, so the masthead shows Mara Ellison and 0 without a hydration mismatch.
-
-The store is not safe across requests. It lives on the process `globalThis`. A click cannot happen during SSR today, but any future server-side `publish` would leak into the next request. There is no per-request store.
-
-## 8. What happens when a remote dev server is down?
-
-The host document still stream-renders. `createLazyComponent`'s `fallback` renders `role="alert"` with the remote name and, when `errorType === ERROR_TYPE.LOAD_REMOTE`, the text "The remote dev server is not reachable." The other slots are independent components, so one failed loader does not replace the masthead or the debug panel. This was observed when `noSSR` was off and Node could not evaluate `remoteEntry.js`: the product slot showed the alert and the shell stayed intact.
-
-## 9. Were there hydration mismatches?
-
-No hydration warning was logged while loading the composed page, adding a line, and selecting a product. The shell's server HTML and first client render both use the untouched initial store. Remote panels are not in the server HTML. Their loading text is the server output, and the panels mount in the browser after `createLazyComponent` resolves.
-
-A separate dev-only page error, `globalThis.rspackHotUpdatehost is not a function`, showed up on some loads while the host and remotes were rebuilding. It did not block the passing Playwright run once the dev servers were idle.
-
-## 10. Can each MFE build on its own?
-
-Yes. With the other dev servers ignored, these succeeded:
-
-- `pnpm --filter @mfe/product build`
-- `pnpm --filter @mfe/cart build`
-- `pnpm --filter @mfe/profile build`
-- `pnpm --filter @mfe/host build`
-
-Each remote build writes its own `dist/mf-manifest.json` and `dist/remoteEntry.js`. The host build does not need the remotes to be running because `dts: false` skips remote type generation. Hand-written module declarations live in `apps/host/src/remote-modules.d.ts`.
-
-## 11. How do remote styles arrive, and is there a flash?
-
-Each expose emits a CSS file. The browser loaded, for example, `http://127.0.0.1:3001/static/css/async/__federation_expose_ProductPanel.css` with status 200. `lazyLoadComponentPlugin` is registered so the client runtime can inject those links with the component.
-
-Because `noSSR` is on, those styles are not in the first HTML chunk. The shell paints immediately, and the panels paint when their CSS and JS arrive. There is a loading-text gap, not a flash of the panel's unstyled markup. The Modern.js guide's CSS-flicker fix (injecting producer CSS during SSR) needs a producer that actually SSR-renders. This setup cannot use that path.
-
-## 12. What remains unsafe for a production multi-tenant deployment?
-
-- The communication runtime is process-global on the server and window-global in the browser. It is not isolated per user or per tab.
-- Remote URLs and `assetPrefix` are fixed to `http://127.0.0.1:3001` through `3003`. A deployed host would need real origins in the manifest public path.
-- React 19.3.1 is required by Modern.js 3.12 (`@modern-js/utils` peers `react@^19.3.1`). `react-helmet@6` still declares a peer of React 16–18, and the federation runtime warns that the host's React 19.3.1 does not satisfy that range. The page still ran on one React 19 copy.
-- Dev HMR can throw `rspackHotUpdatehost is not a function` while a rebuild is in flight.
-- There is no authentication, persistence, or contract negotiation beyond the Zod parse in this process.
-- Remote component HTML is absent from the stream, so a crawler that does not run JavaScript sees the shell and the loading text only.
-
-## Versions that had to move
-
-The Module Federation Modern.js package is developed against React 18.3.1, and its peer is `react >= 17`. Modern.js 3.12.0's own utils package peers `react@^19.3.1` and `react-server-dom-rspack` peers `react@^19.1.0`. The PoC uses React 19.3.1 so the host's declared peers match. TypeScript is pinned to 5.9.3, inside the plugin's `^5 || ^6 || ^7` range, rather than TypeScript 7.
+Mode A is a CSR remote: the server renders the shell and a loading or error string. Mode B is this repo. The producers are Modern.js apps with streaming SSR, component-level `exposes`, and `ssrRemoteEntry`. The host response for `/products` includes the product title. The host calls `registerShared` for React and the SDK because the server compilation consumes those singletons without publishing them into the share scope; otherwise each remote runs a second React and SSR throws on `useContext`. Hydration then uses the same runtime id. Client route changes are applied with `history.pushState` in the host navigation handler because, in this Modern.js 3.12 and Module Federation combination, `useNavigate` updated the address bar without committing the matched route view. The in-memory runtime therefore survives navigation, and a hard load still SSR-renders the requested URL.

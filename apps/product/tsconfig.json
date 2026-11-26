@@ -1,8 +1,0 @@
-{
-  "extends": "@mfe/tsconfig/react.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "baseUrl": "."
-  },
-  "include": ["src", "rsbuild.config.ts"]
-}

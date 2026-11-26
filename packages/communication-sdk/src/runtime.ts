@@ -1,187 +1,213 @@
 import {
-  AppEventSchema,
-  defaultUser,
-  type AppEvent,
-  type CartItem,
-  type Product,
-  type User,
-} from '@mfe/contracts';
+  AuthStateSchema,
+  LanguageStateSchema,
+  NavigationStateSchema,
+  PlatformContextSchema,
+  CONTRACT_VERSION,
+  PlatformMessageSchema,
+  anonymousContext,
+  redact,
+  userById,
+  type AuthState,
+  type LanguageState,
+  type NavigationState,
+  type PlatformContext,
+  type PlatformMessage,
+} from '@platform/contracts';
 import mitt, { type Emitter } from 'mitt';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-export interface LogEntry {
+export interface HistoryEntry {
   id: string;
-  at: string;
-  type: AppEvent['type'];
-  source: AppEvent['source'];
-  summary: string;
+  type: string;
+  version: number;
+  source: string;
+  timestamp: number;
+  correlationId?: string;
+  payload: unknown;
 }
 
-export interface AppState {
-  selectedProduct: Product | null;
-  cart: CartItem[];
-  user: User;
-  log: LogEntry[];
+export interface ValidationErrorEntry {
+  id: string;
+  timestamp: number;
+  source: string;
+  message: string;
 }
 
-type EventMap = {
-  [Event in AppEvent as Event['type']]: Event;
+export interface Diagnostics {
+  runtimeId: string;
+  subscribers: Record<string, number>;
+  history: HistoryEntry[];
+  validationErrors: ValidationErrorEntry[];
+}
+
+type CommandHandlers = {
+  login?: (input: { username: string; password: string }) => Promise<void> | void;
+  logout?: () => Promise<void> | void;
+  language?: (locale: LanguageState['locale']) => Promise<void> | void;
+  navigation?: (destination: string) => Promise<void> | void;
 };
 
-export interface CommunicationRuntime {
-  bus: Emitter<EventMap>;
-  store: StoreApi<AppState>;
+export interface Runtime {
+  id: string;
+  store: StoreApi<PlatformContext>;
+  bus: Emitter<Record<string, PlatformMessage>>;
+  subscribers: Record<string, number>;
+  history: HistoryEntry[];
+  validationErrors: ValidationErrorEntry[];
+  commands: CommandHandlers;
+  listeners: Set<() => void>;
+  cachedDiagnostics: Diagnostics;
 }
 
-const GLOBAL_KEY = Symbol.for('@mfe/communication-sdk/runtime');
-
-type GlobalWithRuntime = typeof globalThis & {
-  [GLOBAL_KEY]?: CommunicationRuntime;
-};
-
-export function initialState(): AppState {
+export function createRuntime(snapshot: PlatformContext, id: string = globalThis.crypto.randomUUID()): Runtime {
   return {
-    selectedProduct: null,
-    cart: [],
-    user: defaultUser,
-    log: [],
+    id,
+    store: createStore<PlatformContext>(() => PlatformContextSchema.parse(snapshot)),
+    bus: mitt<Record<string, PlatformMessage>>(),
+    subscribers: {},
+    history: [],
+    validationErrors: [],
+    commands: {},
+    listeners: new Set(),
+    cachedDiagnostics: {
+      runtimeId: id,
+      subscribers: {},
+      history: [],
+      validationErrors: [],
+    },
   };
 }
 
-export function createRuntime(): CommunicationRuntime {
+export function diagnosticsOf(runtime: Runtime): Diagnostics {
   return {
-    bus: mitt<EventMap>(),
-    store: createStore<AppState>(() => initialState()),
+    runtimeId: runtime.id,
+    subscribers: { ...runtime.subscribers },
+    history: runtime.history.map((entry) => ({ ...entry })),
+    validationErrors: runtime.validationErrors.map((entry) => ({ ...entry })),
   };
 }
 
-export function getRuntime(): CommunicationRuntime {
-  const scope = globalThis as GlobalWithRuntime;
-  const existing = scope[GLOBAL_KEY];
-  if (existing) {
-    return existing;
-  }
-  const created = createRuntime();
-  scope[GLOBAL_KEY] = created;
-  return created;
-}
-
-export function cartCount(items: readonly CartItem[]): number {
-  return items.reduce((sum, item) => sum + item.quantity, 0);
-}
-
-export function cartTotalCents(items: readonly CartItem[]): number {
-  return items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
-}
-
-function summarize(event: AppEvent, previous: AppState): string {
-  switch (event.type) {
-    case 'catalog.product.selected':
-      return `Selected ${event.product.name}`;
-    case 'cart.item.added':
-      return `Added ${event.item.name} × ${event.item.quantity}`;
-    case 'cart.item.removed':
-      return `Removed ${event.name}`;
-    case 'profile.user.switched':
-      return `Switched user from ${previous.user.displayName} to ${event.user.displayName}`;
-    default: {
-      const neverEvent: never = event;
-      return neverEvent;
-    }
+function notify(runtime: Runtime) {
+  runtime.cachedDiagnostics = diagnosticsOf(runtime);
+  for (const listener of runtime.listeners) {
+    listener();
   }
 }
 
-function addItem(cart: readonly CartItem[], item: CartItem): CartItem[] {
-  const existing = cart.find((line) => line.productId === item.productId);
-  if (!existing) {
-    return [...cart, item];
-  }
-  return cart.map((line) =>
-    line.productId === item.productId
-      ? { ...line, quantity: line.quantity + item.quantity }
-      : line,
-  );
+export function remember(runtime: Runtime, message: PlatformMessage) {
+  runtime.history = [
+    ...runtime.history,
+    {
+      id: message.id,
+      type: message.type,
+      version: message.version,
+      source: message.source,
+      timestamp: message.timestamp,
+      correlationId: message.correlationId,
+      payload: redact(message.payload),
+    },
+  ].slice(-40);
+  notify(runtime);
 }
 
-function reduce(state: AppState, event: AppEvent): Pick<AppState, 'selectedProduct' | 'cart' | 'user'> {
-  switch (event.type) {
-    case 'catalog.product.selected':
-      return {
-        selectedProduct: event.product,
-        cart: state.cart,
-        user: state.user,
-      };
-    case 'cart.item.added':
-      return {
-        selectedProduct: state.selectedProduct,
-        cart: addItem(state.cart, event.item),
-        user: state.user,
-      };
-    case 'cart.item.removed':
-      return {
-        selectedProduct: state.selectedProduct,
-        cart: state.cart.filter((line) => line.productId !== event.productId),
-        user: state.user,
-      };
-    case 'profile.user.switched':
-      return {
-        selectedProduct: state.selectedProduct,
-        cart: state.cart,
-        user: event.user,
-      };
-    default: {
-      const neverEvent: never = event;
-      return neverEvent;
-    }
-  }
+export function rememberError(runtime: Runtime, source: string, message: string) {
+  runtime.validationErrors = [
+    ...runtime.validationErrors,
+    { id: globalThis.crypto.randomUUID(), timestamp: Date.now(), source, message },
+  ].slice(-20);
+  notify(runtime);
 }
 
-export function publish(input: unknown): AppEvent {
-  const event = AppEventSchema.parse(input);
-  const runtime = getRuntime();
-  let entry: LogEntry | undefined;
-  runtime.store.setState((state) => {
-    entry = {
-      id: globalThis.crypto.randomUUID(),
-      at: new Date().toISOString(),
-      type: event.type,
-      source: event.source,
-      summary: summarize(event, state),
-    };
-    const next = reduce(state, event);
-    return {
-      ...next,
-      log: [...state.log, entry].slice(-30),
-    };
+export function emitMessage(runtime: Runtime, input: unknown, source: string): PlatformMessage {
+  const parsed = PlatformMessageSchema.safeParse(input);
+  if (!parsed.success) {
+    rememberError(runtime, source, parsed.error.issues.map((issue) => issue.message).join('; '));
+    throw parsed.error;
+  }
+  remember(runtime, parsed.data);
+  runtime.bus.emit(parsed.data.type, parsed.data);
+  return parsed.data;
+}
+
+export function createMessage(
+  type: PlatformMessage['type'],
+  source: string,
+  payload: unknown,
+  correlationId?: string,
+): PlatformMessage {
+  return PlatformMessageSchema.parse({
+    id: globalThis.crypto.randomUUID(),
+    type,
+    version: CONTRACT_VERSION,
+    source,
+    timestamp: Date.now(),
+    correlationId,
+    payload,
   });
-  runtime.bus.emit(event.type, event);
-  return event;
 }
 
-export function onAny(handler: (event: AppEvent) => void): () => void {
-  const runtime = getRuntime();
-  const wrapped = (type: keyof EventMap, event: EventMap[keyof EventMap]) => {
-    if (!event || event.type !== type) {
-      return;
-    }
-    handler(event);
-  };
-  runtime.bus.on('*', wrapped);
-  return () => {
-    runtime.bus.off('*', wrapped);
-  };
+export function readContext(runtime: Runtime): PlatformContext {
+  const state = runtime.store.getState();
+  return PlatformContextSchema.parse(state);
 }
 
-export function resetCommunication(): void {
-  const runtime = getRuntime();
-  runtime.bus.all.clear();
-  runtime.store.setState(initialState(), true);
+export function writeAuth(runtime: Runtime, auth: AuthState) {
+  runtime.store.setState({ ...runtime.store.getState(), auth: AuthStateSchema.parse(auth) });
+  notify(runtime);
 }
 
-export const appStore = new Proxy({} as StoreApi<AppState>, {
-  get(_target, property, receiver) {
-    const store = getRuntime().store;
-    const value = Reflect.get(store, property, receiver);
-    return typeof value === 'function' ? value.bind(store) : value;
-  },
-});
+export function writeLanguage(runtime: Runtime, language: LanguageState) {
+  runtime.store.setState({
+    ...runtime.store.getState(),
+    language: LanguageStateSchema.parse(language),
+  });
+  notify(runtime);
+}
+
+export function writeNavigation(runtime: Runtime, navigation: NavigationState) {
+  runtime.store.setState({
+    ...runtime.store.getState(),
+    navigation: NavigationStateSchema.parse(navigation),
+  });
+  notify(runtime);
+}
+
+let browserRuntime: Runtime | null = null;
+
+export function ensureBrowserRuntime(snapshot: PlatformContext, id?: string): Runtime {
+  if (!browserRuntime) {
+    browserRuntime = createRuntime(snapshot, id ?? globalThis.crypto.randomUUID());
+  }
+  return browserRuntime;
+}
+
+export function resetBrowserRuntime() {
+  browserRuntime = null;
+}
+
+export function contextFromRequest(request: Request): PlatformContext {
+  const url = new URL(request.url);
+  const cookies = parseCookie(request.headers.get('cookie') ?? '');
+  const locale = cookies.platform_locale === 'th' ? 'th' : 'en';
+  const user = cookies.platform_session ? userById(cookies.platform_session) : null;
+  return PlatformContextSchema.parse({
+    auth: user ? { status: 'authenticated', user } : { status: 'anonymous', user: null },
+    language: { locale },
+    navigation: { pathname: url.pathname || '/', search: url.search },
+  });
+}
+
+function parseCookie(header: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const index = trimmed.indexOf('=');
+    if (index <= 0) continue;
+    cookies[decodeURIComponent(trimmed.slice(0, index))] = decodeURIComponent(trimmed.slice(index + 1));
+  }
+  return cookies;
+}
+
+export { anonymousContext };

@@ -1,14 +1,12 @@
-declare module 'product/ProductPanel' {
-  import type { ReactElement } from 'react';
-  export function ProductPanel(): ReactElement;
+declare module 'product/Catalog' {
+  export function Catalog(): JSX.Element;
 }
-
-declare module 'cart/CartPanel' {
-  import type { ReactElement } from 'react';
-  export function CartPanel(): ReactElement;
+declare module 'cart/CartView' {
+  export function CartView(): JSX.Element;
 }
-
-declare module 'profile/ProfilePanel' {
-  import type { ReactElement } from 'react';
-  export function ProfilePanel(): ReactElement;
+declare module 'cart/CartController' {
+  export function CartController(): JSX.Element;
+}
+declare module 'profile/ProfileView' {
+  export function ProfileView(): JSX.Element;
 }

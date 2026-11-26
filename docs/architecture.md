@@ -1,67 +1,61 @@
 # Architecture
 
-Northwind Atelier is a pnpm workspace with one Modern.js host and three Rsbuild remotes. The host is the only composer. No app imports another app's source. The boundary test in `boundaries.test.ts` fails the build if that rule is broken.
+Northwind Atelier is a proof of concept for independently deployable React microfrontends composed by a Modern.js v3 host. The monorepo is only a development convenience. Each app depends on the shared packages with semver ranges (`^1.0.0`), not `workspace:*`, and remote URLs come from environment variables.
 
 ```mermaid
 flowchart LR
-  subgraph hostApp [Host :3000 Modern.js stream SSR]
+  subgraph hostApp ["Host :PORT Modern.js stream SSR"]
     Header
-    Slots
-    Debug
+    Routes
+    Debug["@platform/debug-panel"]
   end
-  subgraph remotes [Rsbuild remotes]
-    Product[:3001 ProductPanel]
-    Cart[:3002 CartPanel]
-    Profile[:3003 ProfilePanel]
-  end
-  SDK["@mfe/communication-sdk\nMitt bus + Zustand vanilla store"]
-  Contracts["@mfe/contracts\nZod events"]
-  hostApp -->|createLazyComponent noSSR| remotes
+  Product["product-mfe Modern.js producer"]
+  Cart["cart-mfe Modern.js producer"]
+  Profile["profile-mfe Modern.js producer"]
+  SDK["@platform/mfe-communication 1.0.0"]
+  Contracts["@platform/contracts 1.0.0"]
+  hostApp -->|mf-manifest.json from env| Product
+  hostApp -->|mf-manifest.json from env| Cart
+  hostApp -->|mf-manifest.json from env| Profile
+  Header --> SDK
+  Debug --> SDK
   Product --> SDK
   Cart --> SDK
   Profile --> SDK
-  Header --> SDK
-  Debug --> SDK
   SDK --> Contracts
 ```
 
-## Packages
+## Technology substitution
 
-| Package | Job |
-| --- | --- |
-| `@mfe/contracts` | Zod schemas for products, cart lines, users, and the four `AppEvent` variants. Also the two demo users and `formatPrice`. |
-| `@mfe/communication-sdk` | `publish`, `onAny`, `appStore`, `resetCommunication`. One Mitt emitter and one Zustand vanilla store per JavaScript realm. |
-| `@mfe/tsconfig` | Shared `base.json` and `react.json`. |
+The spec lists Rsbuild for MFE builds. Rsbuild application builds emit a browser `remoteEntry` and no `ssrRemoteEntry`, so the Modern.js server cannot render them (`self is not defined`). Official Module Federation docs support two producer shapes for streaming SSR:
 
-`publish` parses the payload with `AppEventSchema` before it touches the store or the bus. A rejected payload throws and leaves both channels unchanged.
+- A Modern.js v3 app with `server.ssr.mode: 'stream'` and `@module-federation/modern-js-v3`.
+- An Rslib library with `pluginModuleFederation(..., { target: 'dual' })`. `target: 'dual'` is not supported for Rsbuild apps.
+
+This repo uses Modern.js producers. Modern.js 3 already bundles with Rspack, each app still has its own `build` and `serve`, and the manifest includes `ssrRemoteEntry` (`type: commonjs-module`). That is what puts product names in the host's HTTP response. The substitution is documented here and in `poc-findings.md`.
+
+## Ownership
+
+| State | Owner | Who may write it |
+| --- | --- | --- |
+| Authentication, language, navigation | Host | Host command handlers only |
+| Cart lines | Cart MFE | `CartController`, stored on the shared runtime object |
+| Product selection | Product MFE | Local React state |
+| Translations | Each MFE | Its own dictionary |
+
+MFEs call `requestLogin`, `requestLogout`, `requestLanguageChange`, and `requestNavigation`. Those publish a command envelope and then invoke the host handler. They do not call `applyAuth` or `applyLanguage`.
 
 ## Module Federation
 
-The host uses the official Modern.js v3 integration:
+Shared singletons use the versions exported by `@platform/contracts`:
 
-- `@module-federation/modern-js-v3` `moduleFederationPlugin()` in `apps/host/modern.config.ts`
-- `createModuleFederationConfig` in `apps/host/module-federation.config.ts`
-- `server.ssr.mode: 'stream'` and `server.port: 3000`
-- Consumption through `createLazyComponent` and `lazyLoadComponentPlugin` from `@module-federation/modern-js-v3/data-fetch`
+- `react` and `react-dom`: `^19.3.1`
+- `@platform/mfe-communication` and `@platform/contracts`: `^1.0.0`
 
-Each remote uses `@module-federation/rsbuild-plugin` `pluginModuleFederation` and exposes one component module:
+The host marks them `eager: true`. Remotes use the same ranges with `eager: false`. Producers emit `static/remoteEntry.js` and `static/mf-manifest.json`, which `modern serve` actually hosts (`dist/static` and `dist/bundles` are public; files at the dist root are not). Remote URLs are `PRODUCT_REMOTE_URL`, `CART_REMOTE_URL`, and `PROFILE_REMOTE_URL`. There is no `127.0.0.1` literal in the federation config. The host also calls `registerShared` with its React, React DOM, SDK, and contracts modules, because the server bundle does not put those providers into the webpack share scope on its own. Without that registration each remote evaluates a second React and `useContext` is null during SSR.
 
-| Remote | Expose | Dev manifest |
-| --- | --- | --- |
-| product | `./ProductPanel` | `http://127.0.0.1:3001/mf-manifest.json` |
-| cart | `./CartPanel` | `http://127.0.0.1:3002/mf-manifest.json` |
-| profile | `./ProfilePanel` | `http://127.0.0.1:3003/mf-manifest.json` |
+`MF_DTS=1` turns on Module Federation type generation when the producers are reachable. Otherwise each host keeps a local ambient module shim (`remote-modules.d.ts`) that does not import another app. Payload types live in `@platform/contracts`.
 
-React, React DOM, and `@mfe/communication-sdk` are shared singletons. The host marks React and the SDK `eager: true` so the shell provides them. The SDK sets `requiredVersion: false` because the workspace dependency specifier is `workspace:*`, which is not a semver range Module Federation can satisfy.
+## Separate repositories
 
-The panels are component exports. The host does not use `createBridgeComponent` or `createRemoteAppComponent`. Those application-level modules cannot be server-rendered.
-
-## Why `noSSR` is set
-
-A production-shaped Rsbuild app build emits `mf-manifest.json` with `metaData.remoteEntry.type: "global"` and no `ssrRemoteEntry`. The Modern.js server runtime then tries to evaluate `remoteEntry.js` in Node and fails with `self is not defined`. `createLazyComponent` accepts `noSSR: true`, so the host still stream-renders its own shell and the browser loads the remotes after hydration.
-
-The supported ways to get remote HTML into the stream are a Modern.js producer that also sets `server.ssr.mode: 'stream'`, or an Rslib producer built with `pluginModuleFederation(..., { target: 'dual' })`. `target: 'dual'` is only supported as a global plugin in Rslib or Rspress, not in an Rsbuild app. See [poc-findings.md](./poc-findings.md).
-
-## UI
-
-The host shell owns the masthead and the debug panel. The masthead reads the shared user and the cart count. The debug panel lists the store log and counts Mitt deliveries. Each remote owns its panel and can also be opened on its own port.
+Pack the shared packages and install them into a copy of each app that lives outside this workspace. `pnpm prove:split` does that, runs `modern build` and `modern serve` for each app on ports 3100–3103, checks the product name in the server HTML, and runs the e2e suite against that host. See the README.

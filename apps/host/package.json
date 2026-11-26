@@ -1,29 +1,33 @@
 {
-  "name": "@mfe/host",
-  "version": "0.0.0",
+  "name": "@platform/host",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "modern dev",
     "build": "modern build",
     "serve": "modern serve",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mfe/communication-sdk": "workspace:*",
-    "@mfe/contracts": "workspace:*",
-    "@modern-js/runtime": "3.12.0",
     "@module-federation/modern-js-v3": "2.9.4",
+    "@modern-js/runtime": "3.12.0",
+    "@platform/contracts": "^1.0.0",
+    "@platform/debug-panel": "^1.0.0",
+    "@platform/mfe-communication": "^1.0.0",
+    "dotenv": "17.2.3",
     "react": "19.3.1",
-    "react-dom": "19.3.1",
-    "zustand": "5.0.8"
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@mfe/tsconfig": "workspace:*",
     "@modern-js/app-tools": "3.12.0",
     "@modern-js/tsconfig": "3.12.0",
+    "@platform/tsconfig": "^1.0.0",
+    "@tailwindcss/postcss": "4.3.5",
     "@types/node": "22.19.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.3",
+    "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
   }

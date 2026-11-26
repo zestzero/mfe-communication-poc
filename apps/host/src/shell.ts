@@ -1,0 +1,38 @@
+import type { Locale } from '@platform/contracts';
+
+export const shellCopy: Record<Locale, Record<string, string>> = {
+  en: {
+    brand: 'Northwind Atelier',
+    login: 'Log in',
+    logout: 'Log out',
+    username: 'Username',
+    password: 'Password',
+    language: 'Language',
+    auth: 'Authentication',
+    anonymous: 'Signed out',
+    authenticated: 'Signed in',
+    cart: 'Basket',
+    home: 'Home',
+    products: 'Products',
+    profile: 'Profile',
+    welcome: 'A streaming host for independently deployed microfrontends.',
+    rejected: 'Those credentials were rejected.',
+  },
+  th: {
+    brand: 'นอร์ธวินด์',
+    login: 'เข้าสู่ระบบ',
+    logout: 'ออกจากระบบ',
+    username: 'ชื่อผู้ใช้',
+    password: 'รหัสผ่าน',
+    language: 'ภาษา',
+    auth: 'การยืนยันตัวตน',
+    anonymous: 'ยังไม่เข้าสู่ระบบ',
+    authenticated: 'เข้าสู่ระบบแล้ว',
+    cart: 'ตะกร้า',
+    home: 'หน้าแรก',
+    products: 'สินค้า',
+    profile: 'โปรไฟล์',
+    welcome: 'โฮสต์แบบสตรีมสำหรับไมโครฟรอนต์เอนด์ที่ปล่อยแยกกัน',
+    rejected: 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง',
+  },
+};
