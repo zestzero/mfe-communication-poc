@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +31,16 @@ function rewriteDeps(pkgPath, tarballs) {
   writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
+for (const port of [3100, 3101, 3102, 3103]) {
+  try {
+    const pids = execFileSync('lsof', ['-t', `-iTCP:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' }).trim();
+    for (const pid of pids.split('\n').filter(Boolean)) {
+      process.kill(Number(pid), 'SIGTERM');
+    }
+  } catch {
+    // nothing is listening
+  }
+}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(packs, { recursive: true });
 await run('pnpm', ['-r', '--filter', './packages/*', 'build'], { cwd: root });

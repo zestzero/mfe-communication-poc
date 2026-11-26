@@ -45,6 +45,8 @@ This repo uses Modern.js producers. Modern.js 3 already bundles with Rspack, eac
 
 MFEs call `requestLogin`, `requestLogout`, `requestLanguageChange`, and `requestNavigation`. Those publish a command envelope and then invoke the host handler. They do not call `applyAuth` or `applyLanguage`.
 
+The host uses Modern.js file routes. The layout renders `<Outlet />`, the header uses `Link`, and the navigation command calls `useNavigate`. `src/modern.runtime.ts` sets `router.useTransitions` to `false` so those updates commit. React Router otherwise wraps them in `startTransition`, and `useSyncExternalStore` in the shared store forces a synchronous render that drops the transition before the matched view commits. Each route has a `page.data.ts` loader. Cart and profile redirect anonymous requests to `/products?notice=auth`. The layout loader does not revalidate, so the browser runtime survives client navigation.
+
 ## Module Federation
 
 Shared singletons use the versions exported by `@platform/contracts`:

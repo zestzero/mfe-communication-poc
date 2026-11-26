@@ -5,3 +5,7 @@ export const loader = ({ request }: LoaderFunctionArgs) => ({
   snapshot: contextFromRequest(request),
   runtimeId: crypto.randomUUID(),
 });
+
+// The browser runtime is created once from this payload. Re-running the layout
+// loader on every client navigation would mint a new id and a new store.
+export const shouldRevalidate = () => false;

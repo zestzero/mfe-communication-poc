@@ -1,11 +1,10 @@
 import { DebugPanel } from '@platform/debug-panel';
-import { isProtectedPath, type PlatformContext, type PlatformMessage } from '@platform/contracts';
+import type { PlatformContext, PlatformMessage } from '@platform/contracts';
 import { PlatformProvider, requestLanguageChange, requestLogin, requestLogout, useAuth, useLanguage, useRuntime } from '@platform/mfe-communication';
 import { applyAuth, applyLanguage, applyNavigation } from '@platform/mfe-communication/host';
-import { useLoaderData, useLocation } from '@modern-js/runtime/router';
+import { Link, Outlet, useLoaderData, useLocation, useNavigate } from '@modern-js/runtime/router';
 import { useEffect, useState, type FormEvent } from 'react';
-import { HomePanel } from './page';
-import { CartControllerRemote, CartViewRemote, ProductRemote, ProfileRemote, RemoteReady } from '../remotes';
+import { CartControllerRemote } from '../remotes';
 import { useRemoteStatuses } from '../remote-status';
 import { shellCopy } from '../shell';
 import '../styles.css';
@@ -24,8 +23,7 @@ function Shell() {
   const auth = useAuth();
   const language = useLanguage();
   const location = useLocation();
-  const [clientPath, setClientPath] = useState<string | null>(null);
-  const pathname = clientPath ?? location.pathname;
+  const navigate = useNavigate();
   const copy = shellCopy[language.locale];
   const remotes = useRemoteStatuses();
   const [username, setUsername] = useState('mara');
@@ -55,21 +53,14 @@ function Shell() {
         applyLanguage(runtime, { locale }, 'host');
       },
       navigation: (destination) => {
-        setClientPath(destination.split('?')[0] || '/');
-        window.history.pushState({}, '', destination);
+        navigate(destination);
       },
     };
-  }, [runtime]);
+  }, [navigate, runtime]);
 
   useEffect(() => {
-    const onPop = () => setClientPath(window.location.pathname);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  useEffect(() => {
-    applyNavigation(runtime, { pathname, search: location.search }, 'host');
-  }, [location.search, pathname, runtime]);
+    applyNavigation(runtime, { pathname: location.pathname, search: location.search }, 'host');
+  }, [location.pathname, location.search, runtime]);
 
   useEffect(() => {
     const handler = (message: PlatformMessage) => {
@@ -89,12 +80,6 @@ function Shell() {
     }
   }
 
-  const blocked = isProtectedPath(pathname) && auth.status !== 'authenticated';
-  function go(destination: string) {
-    setClientPath(destination);
-    window.history.pushState({}, '', destination);
-  }
-
   return (
     <div className="mx-auto min-h-screen max-w-6xl bg-stone-100 px-4 py-6 text-stone-900">
       <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl bg-stone-950 px-5 py-4 text-stone-50" data-testid="host-header">
@@ -103,10 +88,10 @@ function Shell() {
           <h1 className="font-serif text-4xl">{copy.brand}</h1>
         </div>
         <nav className="flex gap-3 text-sm" aria-label="Primary">
-          <a href="/" data-testid="nav-home" onClick={(event) => { event.preventDefault(); go('/'); }}>{copy.home}</a>
-          <a href="/products" data-testid="nav-products" onClick={(event) => { event.preventDefault(); go('/products'); }}>{copy.products}</a>
-          <a href="/cart" data-testid="nav-cart" onClick={(event) => { event.preventDefault(); go('/cart'); }}>{copy.cart}</a>
-          <a href="/profile" data-testid="nav-profile" onClick={(event) => { event.preventDefault(); go('/profile'); }}>{copy.profile}</a>
+          <Link to="/" data-testid="nav-home">{copy.home}</Link>
+          <Link to="/products" data-testid="nav-products">{copy.products}</Link>
+          <Link to="/cart" data-testid="nav-cart">{copy.cart}</Link>
+          <Link to="/profile" data-testid="nav-profile">{copy.profile}</Link>
         </nav>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <p data-testid="auth-status">{auth.status === 'authenticated' ? copy.authenticated : copy.anonymous}</p>
@@ -133,11 +118,7 @@ function Shell() {
       {error ? <p role="alert" data-testid="login-error">{error}</p> : null}
       <CartControllerRemote />
       <main className="mt-6">
-        {blocked ? <p data-testid="auth-guard">Sign in to open this page.</p> : null}
-        {!blocked && pathname === '/' ? <HomePanel /> : null}
-        {!blocked && pathname === '/products' ? <RemoteReady name="product" testId="mfe-product"><ProductRemote /></RemoteReady> : null}
-        {!blocked && pathname === '/cart' ? <RemoteReady name="cart" testId="mfe-cart"><CartViewRemote /></RemoteReady> : null}
-        {!blocked && pathname === '/profile' ? <RemoteReady name="profile" testId="mfe-profile"><ProfileRemote /></RemoteReady> : null}
+        <Outlet />
       </main>
       <DebugPanel remotes={remotes} />
     </div>

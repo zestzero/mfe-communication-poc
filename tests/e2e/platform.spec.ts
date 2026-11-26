@@ -72,6 +72,57 @@ test('login, cart, language, navigation, refresh, and runtime identity', async (
   expect(hydration).toEqual([]);
 });
 
+test('client navigation runs route loaders, history, and the auth guard', async ({ page }) => {
+  await page.goto('/products', { waitUntil: 'networkidle' });
+  await expect(page.getByTestId('route-loader')).toHaveText('products');
+  await page.getByTestId('login-submit').click();
+  await expect(page.getByTestId('host-user')).toHaveText('Mara Ellison');
+  const runtime = (await page.getByTestId('runtime-id').innerText()).replace('Runtime ', '');
+
+  await page.getByTestId('nav-cart').click();
+  await expect(page).toHaveURL(/\/cart$/);
+  await expect(page.getByTestId('route-loader')).toHaveText('cart');
+  await expect(page.getByTestId('mfe-cart')).toBeVisible();
+  await expect(page.getByTestId('runtime-id')).toContainText(runtime);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/products$/);
+  await expect(page.getByTestId('route-loader')).toHaveText('products');
+  await expect(page.getByTestId('mfe-product')).toBeVisible();
+  await page.goForward();
+  await expect(page.getByTestId('route-loader')).toHaveText('cart');
+
+  await page.getByTestId('nav-profile').click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByTestId('route-loader')).toHaveText('profile');
+  await expect(page.getByTestId('mfe-profile')).toBeVisible();
+  await expect(page.getByTestId('runtime-id')).toContainText(runtime);
+
+  await page.getByTestId('profile-logout').click();
+  await page.getByTestId('nav-cart').click();
+  await expect(page).toHaveURL(/\/products\?notice=auth$/);
+  await expect(page.getByTestId('auth-guard')).toBeVisible();
+  await expect(page.getByTestId('mfe-product')).toBeVisible();
+  await expect(page.getByTestId('mfe-cart')).toHaveCount(0);
+});
+
+test('a direct protected URL redirects anonymous visitors and still renders the cart when signed in', async ({ request }) => {
+  const anonymous = await request.get('/cart');
+  expect(anonymous.url()).toContain('/products?notice=auth');
+  const anonymousHtml = await anonymous.text();
+  expect(anonymousHtml).toContain('data-testid="auth-guard"');
+  expect(anonymousHtml).toContain('Cedar Pour-Over');
+  expect(anonymousHtml).not.toContain('data-testid="mfe-cart"');
+
+  const signedIn = await request.get('/cart', { headers: { cookie: 'platform_session=user-mara' } });
+  expect(signedIn.url()).toMatch(/\/cart$/);
+  const signedInHtml = await signedIn.text();
+  expect(signedInHtml).toContain('data-testid="route-loader"');
+  expect(signedInHtml).toContain('>cart<');
+  expect(signedInHtml).toContain('data-testid="mfe-cart"');
+  expect(signedInHtml).toContain('The basket is empty.');
+});
+
 test('the host stays up when one remote is unavailable', async ({ page }) => {
   await page.route('**/127.0.0.1:3003/**', (route) => route.abort());
   await page.goto('/products', { waitUntil: 'domcontentloaded' });
