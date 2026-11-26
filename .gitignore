@@ -1,0 +1,13 @@
+node_modules
+dist
+.modern-js
+.output
+@mf-types
+playwright-report
+test-results
+blob-report
+coverage
+*.log
+*.tsbuildinfo
+.DS_Store
+.turbo

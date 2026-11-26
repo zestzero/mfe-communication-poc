@@ -1,0 +1,30 @@
+{
+  "name": "@mfe/host",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "modern dev",
+    "build": "modern build",
+    "serve": "modern serve",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mfe/communication-sdk": "workspace:*",
+    "@mfe/contracts": "workspace:*",
+    "@modern-js/runtime": "3.12.0",
+    "@module-federation/modern-js-v3": "2.9.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zustand": "5.0.8"
+  },
+  "devDependencies": {
+    "@mfe/tsconfig": "workspace:*",
+    "@modern-js/app-tools": "3.12.0",
+    "@modern-js/tsconfig": "3.12.0",
+    "@types/node": "22.19.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
