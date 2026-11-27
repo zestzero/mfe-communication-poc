@@ -29,7 +29,7 @@ const shared = {
     shareConfig: { singleton: true, requiredVersion: '^19.3.1', eager: true },
   },
   '@platform/mfe-communication': {
-    version: '1.0.0',
+    version: Communication.SDK_PACKAGE_VERSION,
     scope: 'default',
     lib: () => Communication,
     shareConfig: { singleton: true, requiredVersion: '^1.0.0', eager: true },

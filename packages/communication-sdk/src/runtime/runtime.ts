@@ -15,6 +15,9 @@ import {
 import { redact, userById } from '@platform/debug-panel/lib';
 import mitt, { type Emitter } from 'mitt';
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import { SDK_PACKAGE_VERSION } from './version.js';
+
+export { SDK_PACKAGE_VERSION } from './version.js';
 
 export interface HistoryEntry {
   id: string;
@@ -35,6 +38,7 @@ export interface ValidationErrorEntry {
 
 export interface Diagnostics {
   runtimeId: string;
+  sdkPackageVersion: string;
   subscribers: Record<string, number>;
   history: HistoryEntry[];
   validationErrors: ValidationErrorEntry[];
@@ -71,6 +75,7 @@ export function createRuntime(snapshot: PlatformContext, id: string = globalThis
     listeners: new Set(),
     cachedDiagnostics: {
       runtimeId: id,
+      sdkPackageVersion: SDK_PACKAGE_VERSION,
       subscribers: {},
       history: [],
       validationErrors: [],
@@ -81,6 +86,7 @@ export function createRuntime(snapshot: PlatformContext, id: string = globalThis
 export function diagnosticsOf(runtime: Runtime): Diagnostics {
   return {
     runtimeId: runtime.id,
+    sdkPackageVersion: SDK_PACKAGE_VERSION,
     subscribers: { ...runtime.subscribers },
     history: runtime.history.map((entry) => ({ ...entry })),
     validationErrors: runtime.validationErrors.map((entry) => ({ ...entry })),

@@ -1,4 +1,13 @@
-export { contextFromRequest, createMessage, createRuntime, diagnosticsOf, ensureBrowserRuntime, readContext, resetBrowserRuntime } from './runtime/runtime.js';
+export {
+  contextFromRequest,
+  createMessage,
+  createRuntime,
+  diagnosticsOf,
+  ensureBrowserRuntime,
+  readContext,
+  resetBrowserRuntime,
+  SDK_PACKAGE_VERSION,
+} from './runtime/runtime.js';
 export { PlatformProvider, useDiagnostics, useRuntime } from './runtime/provider.js';
 export { useAuth } from './auth/hook.js';
 export { useLanguage } from './language/hook.js';
