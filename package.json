@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm typecheck",
-    "prove:split": "node scripts/prove-separate-repos.mjs"
+    "prove:split": "node scripts/prove-separate-repos.mjs",
+    "prove:cart-skew": "node scripts/prove-cart-sdk-skew.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

@@ -20,7 +20,12 @@ export function DebugPanel({ remotes }: { remotes: readonly RemoteStatus[] }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-serif text-2xl">Communication debug</h2>
-          <p data-testid="runtime-id">Runtime {diagnostics.runtimeId}</p>
+          <p>
+            Runtime <span data-testid="runtime-id">{diagnostics.runtimeId}</span>
+          </p>
+          <p>
+            SDK <span data-testid="sdk-package-version">{diagnostics.sdkPackageVersion}</span>
+          </p>
         </div>
         <dl className="grid grid-cols-2 gap-x-4 text-sm md:grid-cols-4">
           <div>

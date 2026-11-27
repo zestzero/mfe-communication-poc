@@ -34,14 +34,11 @@ export default {
         if (!userId || passwords[body.username ?? ''] !== body.password) {
           return c.json({ message: 'Unauthorized' }, 401);
         }
-        // Server compile is CommonJS and may rewrite bare specifier imports via bundler
-        // aliases. Resolve the helpers entry from the app root at request time instead.
-        const { pathToFileURL } = await import('node:url');
-        const { createRequire } = await import('node:module');
-        const require = createRequire(process.cwd() + '/package.json');
-        const helpersUrl = pathToFileURL(require.resolve('@platform/debug-panel/lib')).href;
-        const { userById } = await import(helpersUrl);
-        const user = userById(userId);
+        // Avoid bare `@platform/debug-panel/lib` here: the host bundler aliases that
+        // specifier and breaks the CommonJS server middleware. Contracts data is enough.
+        const contractsId = ['@platform', 'contracts'].join('/');
+        const { publicUsers } = await import(contractsId);
+        const user = publicUsers.find((entry: { id: string }) => entry.id === userId) ?? null;
         c.header('Set-Cookie', sessionCookie(userId));
         return c.json({ auth: { status: 'authenticated', user } });
       },

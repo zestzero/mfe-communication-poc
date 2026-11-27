@@ -3,11 +3,19 @@ import { anonymousContext, publicUsers } from '@platform/contracts';
 import { applyAuth } from '../auth/commands.js';
 import { publishOn } from '../events/bus.js';
 import { requestNavigation } from '../navigation/commands.js';
-import { contextFromRequest, createRuntime, readContext } from './runtime.js';
+import { contextFromRequest, createRuntime, diagnosticsOf, readContext, SDK_PACKAGE_VERSION } from './runtime.js';
 import { readRequestSnapshot, runWithRequest } from '../server/index.js';
 
 const mara = publicUsers[0]!;
 const somchai = publicUsers[1]!;
+
+describe('sdk package version', () => {
+  it('surfaces the package version on diagnostics', () => {
+    const runtime = createRuntime(anonymousContext, 'runtime-version');
+    expect(SDK_PACKAGE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(diagnosticsOf(runtime).sdkPackageVersion).toBe(SDK_PACKAGE_VERSION);
+  });
+});
 
 describe('request isolation', () => {
   it('keeps two concurrent request runtimes from sharing auth or language', async () => {

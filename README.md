@@ -47,7 +47,10 @@ pnpm typecheck
 pnpm lint
 pnpm test:e2e
 pnpm prove:split
+pnpm prove:cart-skew
 ```
+
+`pnpm prove:cart-skew` packs `1.0.0` / `1.1.0` / `2.0.0` SDK tarballs and proves cart-only adoption of a compatible minor (one singleton) and an incompatible major (share refusal). See [docs/sdk-version-skew.md](docs/sdk-version-skew.md).
 
 `pnpm test` runs Vitest, including request-isolation and the boundary check that forbids `workspace:*` and cross-app imports. `pnpm prove:split` packs the shared packages, installs each app from those tarballs in `/tmp/mfe-separate-repos`, runs `modern build` and `modern serve` on ports 3100–3103, checks that the product name is in the server HTML, and runs the Playwright suite against that host.
 

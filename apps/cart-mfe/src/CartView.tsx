@@ -1,5 +1,5 @@
 import { formatPrice } from '@platform/debug-panel/lib';
-import { useLanguage, useRuntime } from '@platform/mfe-communication';
+import { useDiagnostics, useLanguage, useRuntime } from '@platform/mfe-communication';
 import { subscribeOn } from '@platform/mfe-communication';
 import { useEffect, useState } from 'react';
 import { readLines } from './cart-state';
@@ -9,6 +9,7 @@ const copy = { en: { title: 'Basket', empty: 'The basket is empty.' }, th: { tit
 
 export function CartView() {
   const runtime = useRuntime();
+  const diagnostics = useDiagnostics();
   const language = useLanguage();
   const [lines, setLines] = useState(() => readLines(runtime));
   useEffect(() => subscribeOn(runtime, 'cart.updated', () => setLines(readLines(runtime))), [runtime]);
@@ -16,6 +17,9 @@ export function CartView() {
   return (
     <section className="rounded-2xl bg-white p-5" data-testid="mfe-cart" data-runtime-id={runtime.id}>
       <h2 className="font-serif text-3xl">{text.title}</h2>
+      <p>
+        Cart SDK <span data-testid="cart-sdk-package-version">{diagnostics.sdkPackageVersion}</span>
+      </p>
       {lines.length === 0 ? <p data-testid="cart-empty">{text.empty}</p> : (
         <ul>
           {lines.map((line) => (
